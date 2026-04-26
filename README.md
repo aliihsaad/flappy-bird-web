@@ -1,5 +1,7 @@
 # Flappy Bird - Enhanced Edition
 
+This project was made by Whisphry.
+
 A modern, web-based recreation of the classic Flappy Bird game with enhanced features, smooth animations, and a life system. This version focuses on a polished user experience with physics-driven movement and a forgiving life-based progression.
 
 ## 🚀 Features
