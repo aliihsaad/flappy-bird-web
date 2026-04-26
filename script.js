@@ -191,9 +191,8 @@ function handleDeath() {
         pipes = pipes.filter(p => p.x > BIRD_X + 100 || p.x < BIRD_X - 50);
         items = items.filter(it => it.x > BIRD_X + 100 || it.x < BIRD_X - 50);
         
-        // Pause and countdown again on life loss
-        gameActive = false;
-        startCountdown();
+        // Resume immediately on life loss instead of countdown
+        gameActive = true;
     }
 }
 
