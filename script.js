@@ -15,6 +15,114 @@ const GROUND_HEIGHT = 112;
 const BIRD_X = 80;
 const BIRD_RADIUS = 14;
 const HEART_DELAY_FRAMES = 600; // Increased delay for hearts (~10 seconds at 60fps)
+// Audio Manager
+const audioManager = {
+    sounds: {},
+    enabled: true,
+    
+    init() {
+        const soundFiles = {
+            wing: 'assets/audio/wing.ogg',
+            point: 'assets/audio/point.ogg',
+            hit: 'assets/audio/hit.ogg',
+            die: 'assets/audio/die.ogg'
+        };
+        
+        for (const [key, path] of Object.entries(soundFiles)) {
+            this.sounds[key] = new Audio(path);
+            this.sounds[key].volume = 0.5;
+        }
+    },
+    
+    play(soundName) {
+        if (!this.enabled || !this.sounds[soundName]) return;
+        
+        const sound = this.sounds[soundName];
+        sound.currentTime = 0;
+        sound.play().catch(err => {
+            // Silently handle errors (autoplay policy, etc.)
+        });
+    },
+    
+    toggle() {
+        this.enabled = !this.enabled;
+        updateMuteButton();
+    }
+};
+
+// Initialize audio on first user interaction
+let audioInitialized = false;
+function initAudioOnFirstInteraction() {
+    if (!audioInitialized) {
+        audioManager.init();
+        audioInitialized = true;
+    }
+}
+
+function toggleAudio() {
+    audioManager.toggle();
+}
+
+function updateMuteButton() {
+    const muteBtn = document.getElementById('mute-btn');
+    if (muteBtn) {
+        muteBtn.innerText = audioManager.enabled ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+    }
+}
+// Audio Manager
+const audioManager = {
+    sounds: {},
+    enabled: true,
+    
+    init() {
+        const soundFiles = {
+            wing: 'assets/audio/wing.ogg',
+            point: 'assets/audio/point.ogg',
+            hit: 'assets/audio/hit.ogg',
+            die: 'assets/audio/die.ogg'
+        };
+        
+        for (const [key, path] of Object.entries(soundFiles)) {
+            this.sounds[key] = new Audio(path);
+            this.sounds[key].volume = 0.5;
+        }
+    },
+    
+    play(soundName) {
+        if (!this.enabled || !this.sounds[soundName]) return;
+        
+        const sound = this.sounds[soundName];
+        sound.currentTime = 0;
+        sound.play().catch(err => {
+            // Silently handle errors (autoplay policy, etc.)
+        });
+    },
+    
+    toggle() {
+        this.enabled = !this.enabled;
+        updateMuteButton();
+    }
+};
+
+// Initialize audio on first user interaction
+let audioInitialized = false;
+function initAudioOnFirstInteraction() {
+    if (!audioInitialized) {
+        audioManager.init();
+        audioInitialized = true;
+    }
+}
+
+function toggleAudio() {
+    audioManager.toggle();
+}
+
+function updateMuteButton() {
+    const muteBtn = document.getElementById('mute-btn');
+    if (muteBtn) {
+        muteBtn.innerText = audioManager.enabled ? '\ud83d\udd0a SOUND ON' : '\ud83d\udd07 SOUND OFF';
+    }
+}
 
 let birdY = (canvas.height - GROUND_HEIGHT) / 2;
 let birdVelocity = 0;
@@ -34,6 +142,7 @@ let countdownTimer = null;
 // Update high score display initially
 const highScoreDisplay = document.getElementById('high-score-display');
 if (highScoreDisplay) highScoreDisplay.innerText = highScore;
+updateMuteButton();
 
 function init() {
     pipes = [];
@@ -165,6 +274,7 @@ function update() {
         if (!pipe.passed && pipe.x + PIPE_WIDTH < BIRD_X - BIRD_RADIUS) {
             pipe.passed = true;
             score++;
+            audioManager.play('point');
             updateHUD();
             const scoreDisplay = document.getElementById('score-display');
             if (scoreDisplay) {
@@ -180,6 +290,7 @@ function update() {
 }
 
 function handleDeath() {
+    audioManager.play('hit');
     lives--;
     updateHUD();
     if (lives <= 0) {
@@ -191,8 +302,7 @@ function handleDeath() {
         pipes = pipes.filter(p => p.x > BIRD_X + 100 || p.x < BIRD_X - 50);
         items = items.filter(it => it.x > BIRD_X + 100 || it.x < BIRD_X - 50);
         
-        // Resume immediately on life loss instead of countdown
-        gameActive = true;
+        // Continue playing immediately with remaining lives
     }
 }
 
@@ -366,6 +476,7 @@ function draw() {
 
 function gameOver() {
     if (!gameStarted) return;
+    audioManager.play('die');
     gameActive = false;
     gameStarted = false;
     if (countdownTimer) clearInterval(countdownTimer);
@@ -384,7 +495,7 @@ function gameOver() {
         document.getElementById('title').innerText = 'GAME OVER';
         document.querySelector('.btn-start').innerText = 'Try Again';
     }
-}
+}}
 
 function gameLoop() {
     update();
@@ -394,11 +505,13 @@ function gameLoop() {
 
 function handleInput() {
     if (!gameStarted) {
+        initAudioOnFirstInteraction();
         init();
     } else if (gameActive) {
+        audioManager.play('wing');
         birdVelocity = JUMP;
     }
-}
+}}
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
