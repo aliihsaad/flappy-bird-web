@@ -5,70 +5,17 @@ const ctx = canvas.getContext('2d');
 canvas.width = 360;
 canvas.height = 640;
 
-const GRAVITY = 0.25;
-const JUMP = -4.5;
-const PIPE_SPEED = 2.5;
-const PIPE_SPAWN_RATE = 90;
+// Gameplay tuning assumes a 60fps baseline; motion is scaled by deltaTime.
+const BASE_FPS = 60;
+const GRAVITY = 0.25; // px/frame^2 @ 60fps baseline
+const JUMP = -4.5; // px/frame @ 60fps baseline
+const PIPE_SPEED = 4; // px/frame @ 60fps baseline
+const PIPE_SPAWN_RATE = 90; // frames between spawns @ 60fps baseline
 const PIPE_WIDTH = 60;
 const PIPE_GAP = 160;
 const GROUND_HEIGHT = 112;
 const BIRD_X = 80;
 const BIRD_RADIUS = 14;
-const HEART_DELAY_FRAMES = 600; // Increased delay for hearts (~10 seconds at 60fps)
-// Audio Manager
-const audioManager = {
-    sounds: {},
-    enabled: true,
-    
-    init() {
-        const soundFiles = {
-            wing: 'assets/audio/wing.ogg',
-            point: 'assets/audio/point.ogg',
-            hit: 'assets/audio/hit.ogg',
-            die: 'assets/audio/die.ogg'
-        };
-        
-        for (const [key, path] of Object.entries(soundFiles)) {
-            this.sounds[key] = new Audio(path);
-            this.sounds[key].volume = 0.5;
-        }
-    },
-    
-    play(soundName) {
-        if (!this.enabled || !this.sounds[soundName]) return;
-        
-        const sound = this.sounds[soundName];
-        sound.currentTime = 0;
-        sound.play().catch(err => {
-            // Silently handle errors (autoplay policy, etc.)
-        });
-    },
-    
-    toggle() {
-        this.enabled = !this.enabled;
-        updateMuteButton();
-    }
-};
-
-// Initialize audio on first user interaction
-let audioInitialized = false;
-function initAudioOnFirstInteraction() {
-    if (!audioInitialized) {
-        audioManager.init();
-        audioInitialized = true;
-    }
-}
-
-function toggleAudio() {
-    audioManager.toggle();
-}
-
-function updateMuteButton() {
-    const muteBtn = document.getElementById('mute-btn');
-    if (muteBtn) {
-        muteBtn.innerText = audioManager.enabled ? '🔊 SOUND ON' : '🔇 SOUND OFF';
-    }
-}
 // Audio Manager
 const audioManager = {
     sounds: {},
@@ -133,11 +80,11 @@ let score = 0;
 let lives = 3;
 let highScore = localStorage.getItem('flappyHighScore') || 0;
 let gameActive = false;
-let frameCount = 0;
 let gameStarted = false;
 let pipesSpawned = 0;
 let countdown = 0;
 let countdownTimer = null;
+let pipeSpawnAccumulatorSeconds = 0;
 
 // Update high score display initially
 const highScoreDisplay = document.getElementById('high-score-display');
@@ -154,8 +101,8 @@ function init() {
     birdRotation = 0;
     gameActive = false; // Wait for countdown
     gameStarted = true;
-    frameCount = 0;
     pipesSpawned = 0;
+    pipeSpawnAccumulatorSeconds = 0;
     
     updateHUD();
 
@@ -209,13 +156,14 @@ function spawnPipe() {
     }
 }
 
-function update() {
+function update(deltaSeconds) {
     if (!gameActive) return;
 
-    frameCount++;
+    const dt = Math.min(0.05, Math.max(0, deltaSeconds || 0));
+    const frameScale = dt * BASE_FPS;
 
-    birdVelocity += GRAVITY;
-    birdY += birdVelocity;
+    birdVelocity += GRAVITY * frameScale;
+    birdY += birdVelocity * frameScale;
     birdRotation = Math.min(Math.PI / 2, Math.max(-Math.PI / 4, birdVelocity * 0.15));
 
     if (birdY + BIRD_RADIUS > canvas.height - GROUND_HEIGHT) {
@@ -227,14 +175,17 @@ function update() {
         birdVelocity = 0;
     }
 
-    if (frameCount % PIPE_SPAWN_RATE === 0) {
+    const pipeSpawnIntervalSeconds = PIPE_SPAWN_RATE / BASE_FPS;
+    pipeSpawnAccumulatorSeconds += dt;
+    while (pipeSpawnAccumulatorSeconds >= pipeSpawnIntervalSeconds) {
         spawnPipe();
+        pipeSpawnAccumulatorSeconds -= pipeSpawnIntervalSeconds;
     }
 
     // Update Items
     for (let i = items.length - 1; i >= 0; i--) {
         let item = items[i];
-        item.x -= PIPE_SPEED;
+        item.x -= PIPE_SPEED * frameScale;
 
         // Collision with bird
         const dx = item.x - BIRD_X;
@@ -258,7 +209,7 @@ function update() {
     // Update Pipes
     for (let i = pipes.length - 1; i >= 0; i--) {
         let pipe = pipes[i];
-        pipe.x -= PIPE_SPEED;
+        pipe.x -= PIPE_SPEED * frameScale;
 
         const birdLeft = BIRD_X - BIRD_RADIUS + 4;
         const birdRight = BIRD_X + BIRD_RADIUS - 4;
@@ -495,10 +446,14 @@ function gameOver() {
         document.getElementById('title').innerText = 'GAME OVER';
         document.querySelector('.btn-start').innerText = 'Try Again';
     }
-}}
+}
 
-function gameLoop() {
-    update();
+let lastFrameTimeMs = 0;
+function gameLoop(timestampMs = 0) {
+    const deltaSeconds = lastFrameTimeMs ? (timestampMs - lastFrameTimeMs) / 1000 : 0;
+    lastFrameTimeMs = timestampMs;
+
+    update(deltaSeconds);
     draw();
     requestAnimationFrame(gameLoop);
 }
@@ -511,7 +466,7 @@ function handleInput() {
         audioManager.play('wing');
         birdVelocity = JUMP;
     }
-}}
+}
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
